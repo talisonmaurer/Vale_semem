@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f3f6f9;
+      margin: 0;
+      padding: 24px;
+      color: #1f2937;
+    }
+
+    .painel {
+      max-width: 620px;
+      margin: auto;
+      background: white;
+      padding: 28px;
+      border-radius: 12px;
+      box-shadow: 0 4px 18px rgba(0, 0, 0, 0.10);
+    }
+
+    h1 {
+      margin-top: 0;
+      color: #173f63;
+      text-align: center;
+    }
+
+    label {
+      display: block;
+      margin-top: 16px;
+      margin-bottom: 6px;
+      font-weight: bold;
+    }
+
+    input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 11px;
+      border: 1px solid #b8c2cc;
+      border-radius: 6px;
+      font-size: 16px;
+    }
+
+    input:focus {
+      border-color: #173f63;
+      outline: none;
+      box-shadow: 0 0 0 2px rgba(23, 63, 99, 0.12);
+    }
+
+    button {
+      width: 100%;
+      margin-top: 22px;
+      padding: 13px;
+      background: #173f63;
+      color: white;
+      border: 0;
+      border-radius: 6px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      background: #8b98a5;
+      cursor: wait;
+    }
+
+    .resultado {
+      display: none;
+      margin-top: 22px;
+      padding: 16px;
+      background: #e9f5e8;
+      border: 1px solid #8bbb84;
+      border-radius: 7px;
+      line-height: 1.6;
+    }
+
+    .resultado-negado {
+      background: #fff3cd;
+      border-color: #d6b656;
+      color: #664d03;
+    }
+
+    .erro {
+      display: none;
+      margin-top: 22px;
+      padding: 16px;
+      background: #fdeaea;
+      border: 1px solid #d98b8b;
+      border-radius: 7px;
+      color: #8b1a1a;
+      line-height: 1.5;
+    }
+
+    .acoes {
+      display: flex;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .acoes a {
+      flex: 1;
+      text-align: center;
+      padding: 11px;
+      background: #173f63;
+      color: white;
+      text-decoration: none;
+      border-radius: 6px;
+    }
+
+    .acoes a:hover {
+      background: #0f304e;
+    }
+
+    .previa {
+      margin-top: 12px;
+      padding: 12px;
+      background: #edf3f8;
+      border-radius: 6px;
+      min-height: 24px;
+      line-height: 1.5;
+    }
+
+    .credito-sistema {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid #d9e1e8;
+      color: #66717c;
+      font-size: 13px;
+      text-align: center;
+    }
+
+    @media (max-width: 600px) {
+      body {
+        padding: 12px;
+      }
+
+      .painel {
+        padding: 20px;
+      }
+
+      .acoes {
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="painel">
+    <h1>Emissão de Vale-Sêmen</h1>
+
+    <label for="nome">Nome do produtor</label>
+    <input
+      id="nome"
+      type="text"
+      autocomplete="off"
+      placeholder="Digite o nome completo"
+    >
+
+    <label for="ie">Inscrição Estadual</label>
+    <input
+      id="ie"
+      type="text"
+      inputmode="numeric"
+      autocomplete="off"
+      placeholder="Digite a Inscrição Estadual"
+    >
+
+    <label for="cpf">CPF</label>
+    <input
+      id="cpf"
+      type="text"
+      inputmode="numeric"
+      autocomplete="off"
+      maxlength="14"
+      placeholder="000.000.000-00"
+      oninput="formatarCpf(this)"
+    >
+
+    <label for="litros">Produção anual de leite (litros)</label>
+    <input
+      id="litros"
+      type="text"
+      inputmode="numeric"
+      autocomplete="off"
+      placeholder="Exemplo: 25000"
+      oninput="consultarCalculo()"
+    >
+
+    <div id="previa" class="previa">
+      Informe a produção para visualizar o cálculo.
+    </div>
+
+    <label for="senhaEmissao">Senha para emissão</label>
+    <input
+      id="senhaEmissao"
+      type="password"
+      autocomplete="current-password"
+      placeholder="Digite a senha de autorização"
+      onkeydown="if (event.key === 'Enter') enviar()"
+    >
+
+    <button id="botao" type="button" onclick="enviar()">
+      Gerar vale
+    </button>
+
+    <div id="resultado" class="resultado"></div>
+    <div id="erro" class="erro"></div>
+
+    <div class="credito-sistema">
+      Criado por Talison Roberto Maurer — v1.0
+    </div>
+  </div>
+
+  <script>
+    let temporizador;
+
+    function consultarCalculo() {
+      clearTimeout(temporizador);
+
+      const litros = document.getElementById('litros').value.trim();
+      const previa = document.getElementById('previa');
+
+      if (!litros) {
+        previa.innerHTML =
+          'Informe a produção para visualizar o cálculo.';
+        return;
+      }
+
+      previa.textContent = 'Calculando...';
+
+      temporizador = setTimeout(() => {
+        google.script.run
+          .withSuccessHandler(calculo => {
+            previa.innerHTML =
+              '<strong>Faixa:</strong> ' +
+              escaparHtml(calculo.faixa) +
+              '<br><strong>Litros necessários por dose:</strong> ' +
+              Number(calculo.litrosPorVale).toLocaleString('pt-BR') +
+              '<br><strong>Quantidade concedida:</strong> ' +
+              calculo.doses + ' doses';
+          })
+          .withFailureHandler(erro => {
+            previa.textContent =
+              obterMensagemErro(erro);
+          })
+          .visualizarCalculo(litros);
+      }, 400);
+    }
+
+    function enviar() {
+      ocultarMensagens();
+
+      const dados = {
+        nome: document.getElementById('nome').value.trim(),
+        ie: document.getElementById('ie').value.trim(),
+        cpf: document.getElementById('cpf').value.trim(),
+        litros: document.getElementById('litros').value.trim(),
+        senha: document.getElementById('senhaEmissao').value
+      };
+
+      if (!dados.nome) {
+        mostrarErro('Informe o nome do produtor.');
+        return;
+      }
+
+      if (!dados.ie) {
+        mostrarErro('Informe a Inscrição Estadual.');
+        return;
+      }
+
+      if (!dados.cpf) {
+        mostrarErro('Informe o CPF.');
+        return;
+      }
+
+      const cpfNumeros = dados.cpf.replace(/\D/g, '');
+
+      if (cpfNumeros.length !== 11) {
+        mostrarErro('Informe um CPF com 11 números.');
+        return;
+      }
+
+      if (!dados.litros) {
+        mostrarErro('Informe a produção anual de leite.');
+        return;
+      }
+
+      if (!dados.senha) {
+        mostrarErro('Informe a senha para emitir o vale.');
+        document.getElementById('senhaEmissao').focus();
+        return;
+      }
+
+      const botao = document.getElementById('botao');
+      botao.disabled = true;
+      botao.textContent = 'Verificando e gerando...';
+
+      google.script.run
+        .withSuccessHandler(resultado => {
+          botao.disabled = false;
+          botao.textContent = 'Gerar vale';
+          limparSenha();
+
+          if (resultado.jaRecebeu) {
+            mostrarValeExistente(resultado);
+            return;
+          }
+
+          mostrarValeGerado(resultado);
+        })
+        .withFailureHandler(erro => {
+          botao.disabled = false;
+          botao.textContent = 'Gerar vale';
+          limparSenha();
+          mostrarErro(obterMensagemErro(erro));
+        })
+        .gerarVale(dados);
+    }
+
+    function mostrarValeGerado(resultado) {
+      const caixa = document.getElementById('resultado');
+
+      caixa.classList.remove('resultado-negado');
+      caixa.style.display = 'block';
+
+      caixa.innerHTML =
+        '<strong>Vale ' +
+        escaparHtml(resultado.numero) +
+        ' gerado com sucesso.</strong>' +
+        '<br><strong>Quantidade:</strong> ' +
+        resultado.doses + ' doses' +
+        '<br><strong>Faixa:</strong> ' +
+        escaparHtml(resultado.faixa) +
+        criarBotoes(
+          resultado.pdfUrl,
+          resultado.documentoUrl,
+          'Abrir ou imprimir PDF',
+          'Editar documento'
+        );
+    }
+
+    function mostrarValeExistente(resultado) {
+      const caixa = document.getElementById('resultado');
+
+      caixa.classList.add('resultado-negado');
+      caixa.style.display = 'block';
+
+      caixa.innerHTML =
+        '<strong>Nova emissão negada.</strong>' +
+        '<br>Este produtor já recebeu o Vale-Sêmen neste ano.' +
+        '<br><strong>Produtor:</strong> ' +
+        escaparHtml(resultado.nome || '') +
+        '<br><strong>Vale:</strong> ' +
+        escaparHtml(resultado.numero || '') +
+        '<br><strong>Data da emissão:</strong> ' +
+        escaparHtml(resultado.data || '') +
+        '<br><strong>Quantidade:</strong> ' +
+        escaparHtml(resultado.doses || '') + ' doses' +
+        '<br><br>Você pode reimprimir o vale original sem gerar outro número.' +
+        criarBotoes(
+          resultado.pdfUrl,
+          resultado.documentoUrl,
+          'Reimprimir PDF',
+          'Abrir documento'
+        );
+    }
+
+    function criarBotoes(
+      pdfUrl,
+      documentoUrl,
+      textoPdf,
+      textoDocumento
+    ) {
+      let html = '<div class="acoes">';
+
+      if (pdfUrl) {
+        html +=
+          '<a href="' + escaparAtributo(pdfUrl) +
+          '" target="_blank" rel="noopener">' +
+          escaparHtml(textoPdf) +
+          '</a>';
+      }
+
+      if (documentoUrl) {
+        html +=
+          '<a href="' + escaparAtributo(documentoUrl) +
+          '" target="_blank" rel="noopener">' +
+          escaparHtml(textoDocumento) +
+          '</a>';
+      }
+
+      html += '</div>';
+      return html;
+    }
+
+    function mostrarErro(mensagem) {
+      const caixaErro = document.getElementById('erro');
+
+      caixaErro.style.display = 'block';
+      caixaErro.textContent = mensagem;
+    }
+
+    function ocultarMensagens() {
+      const resultado = document.getElementById('resultado');
+      const erro = document.getElementById('erro');
+
+      resultado.style.display = 'none';
+      resultado.classList.remove('resultado-negado');
+      resultado.innerHTML = '';
+
+      erro.style.display = 'none';
+      erro.textContent = '';
+    }
+
+    function formatarCpf(campo) {
+      let valor = campo.value.replace(/\D/g, '').slice(0, 11);
+
+      valor = valor.replace(/(\d{3})(\d)/, '$1.$2');
+      valor = valor.replace(/(\d{3})(\d)/, '$1.$2');
+      valor = valor.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+
+      campo.value = valor;
+    }
+
+    function obterMensagemErro(erro) {
+      if (erro && erro.message) {
+        return erro.message;
+      }
+
+      return 'Ocorreu um erro ao processar a solicitação.';
+    }
+
+    function limparSenha() {
+      document.getElementById('senhaEmissao').value = '';
+    }
+
+    function escaparHtml(valor) {
+      return String(valor ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function escaparAtributo(valor) {
+      return escaparHtml(valor);
+    }
+  </script>
+</body>
+</html>
